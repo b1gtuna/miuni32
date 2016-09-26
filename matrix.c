@@ -34,13 +34,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 static uint8_t debouncing = DEBOUNCE;
 
 /* matrix state(1:on, 0:off) */
-static matrix_row_t matrix[MATRIX_ROWS];
-static matrix_row_t matrix_debouncing[MATRIX_ROWS];
+//static matrix_row_t matrix[MATRIX_ROWS];
+//static matrix_row_t matrix_debouncing[MATRIX_ROWS];
 
+static matrix_row_t matrix[MATRIX_COLS];
+static matrix_row_t matrix_debouncing[MATRIX_COLS];
+
+static matrix_col_t read_rows(void);
 static matrix_row_t read_cols(void);
+static void init_rows(void);
 static void init_cols(void);
 static void unselect_rows(void);
+static void unselect_cols(void);
 static void select_row(uint8_t row);
+static void select_col(uint8_t col);
 
 
 inline
@@ -58,11 +65,11 @@ uint8_t matrix_cols(void)
 void matrix_init(void)
 {
     // initialize row and col
-    unselect_rows();
-    init_cols();
+    unselect_cols();
+    init_rows();
 
     // initialize matrix state: all keys off
-    for (uint8_t i=0; i < MATRIX_ROWS; i++) {
+    for (uint8_t i=0; i < MATRIX_COLS; i++) {
         matrix[i] = 0;
         matrix_debouncing[i] = 0;
     }
@@ -70,25 +77,25 @@ void matrix_init(void)
 
 uint8_t matrix_scan(void)
 {
-    for (uint8_t i = 0; i < MATRIX_ROWS; i++) {
-        select_row(i);
+    for (uint8_t i = 0; i < MATRIX_COLS; i++) {
+        select_col(i);
         _delay_us(30);  // without this wait read unstable value.
-        matrix_row_t cols = read_cols();
-        if (matrix_debouncing[i] != cols) {
-            matrix_debouncing[i] = cols;
+        matrix_col_t rows = read_rows();
+        if (matrix_debouncing[i] != rows) {
+            matrix_debouncing[i] = rows;
             if (debouncing) {
                 debug("bounce!: "); debug_hex(debouncing); debug("\n");
             }
             debouncing = DEBOUNCE;
         }
-        unselect_rows();
+        unselect_cols();
     }
 
     if (debouncing) {
         if (--debouncing) {
             _delay_ms(1);
         } else {
-            for (uint8_t i = 0; i < MATRIX_ROWS; i++) {
+            for (uint8_t i = 0; i < MATRIX_COLS; i++) {
                 matrix[i] = matrix_debouncing[i];
             }
         }
@@ -106,7 +113,7 @@ bool matrix_is_modified(void)
 inline
 bool matrix_is_on(uint8_t row, uint8_t col)
 {
-    return (matrix[row] & ((matrix_row_t)1<<col));
+    return (matrix[col] & ((matrix_col_t)1<<row));
 }
 
 inline
@@ -128,10 +135,16 @@ void matrix_print(void)
 uint8_t matrix_key_count(void)
 {
     uint8_t count = 0;
-    for (uint8_t i = 0; i < MATRIX_ROWS; i++) {
+    for (uint8_t i = 0; i < MATRIX_COLS; i++) {
         count += bitpop16(matrix[i]);
     }
     return count;
+}
+
+static void init_rows(void)
+{
+	DDRB &= ~(1<<5 | 1<<4);
+	DDRD &= ~(1<<3);
 }
 
 /* Column pin configuration
@@ -149,6 +162,13 @@ static void  init_cols(void)
     PORTB |=  (1<<7 | 1<<3 | 1<<2 | 1<<1 | 1<<0);
 }
 
+static matrix_col_t read_rows(void)
+{
+	return  (PINB&(1<<5) ? 0 : (1<<0)) |
+			(PINB&(1<<4) ? 0 : (1<<1)) |
+			(PIND&(1<<7) ? 0 : (1<<2));
+}
+
 static matrix_row_t read_cols(void)
 {
     return (PINC&(1<<7) ? 0 : (1<<0)) |
@@ -164,6 +184,17 @@ static matrix_row_t read_cols(void)
            (PINB&(1<<0) ? 0 : (1<<10));
 }
 
+static void unselect_cols(void)
+{
+    // Hi-Z(DDR:0, PORT:0) to unselect
+    DDRB  &= ~0b10001111;
+    PORTB &= ~0b10001111;
+    DDRC  &= ~0b11000000;
+    PORTC &= ~0b11000000;
+	DDRD  &= ~0b00001111;
+    PORTD &= ~0b00001111;
+}
+
 /* Row pin configuration
  * row: 0   1   2
  * pin: D7  B4  B5
@@ -175,6 +206,55 @@ static void unselect_rows(void)
     PORTD &= ~0b10000000;
     DDRB  &= ~0b00110000;
     PORTB &= ~0b00110000;
+}
+
+static void select_col(uint8_t col){
+    switch (col) {
+        	case 0:
+			DDRB |= (1<<0);
+			PORTB &= ~(1<<0);
+            		break;
+		case 1:
+			DDRB |= (1<<1);
+			PORTB &= ~(1<<1);
+			break;
+		case 2:
+			DDRB |= (1<<2);
+			PORTB &= ~(1<<2);
+			break;
+		case 3:
+			DDRB |= (1<<3);
+			PORTB &= ~(1<<3);
+			break;
+		case 4:
+			DDRB |= (1<<7);
+			PORTB &= ~(1<<7);
+			break;
+		case 5:
+			DDRD |= (1<<0);
+			PORTD &= ~(1<<0);
+			break;
+		case 6:
+			DDRD |= (1<<1);
+			PORTD &= ~(1<<1);
+			break;
+		case 7:
+			DDRD |= (1<<2);
+			PORTD &= ~(1<<2);
+			break;
+		case 8:
+			DDRD |= (1<<3);
+			PORTD &= ~(1<<3);
+			break;
+		case 9:
+			DDRC |= (1<<6);
+			PORTC &= ~(1<<6);
+			break;
+		case 10:
+			DDRC |= (1<<7);
+			PORTC &= ~(1<<7);
+			break;
+	}
 }
 
 static void select_row(uint8_t row)
