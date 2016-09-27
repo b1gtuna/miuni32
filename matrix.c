@@ -37,8 +37,8 @@ static uint8_t debouncing = DEBOUNCE;
 //static matrix_row_t matrix[MATRIX_ROWS];
 //static matrix_row_t matrix_debouncing[MATRIX_ROWS];
 
-static matrix_row_t matrix[MATRIX_COLS];
-static matrix_row_t matrix_debouncing[MATRIX_COLS];
+static matrix_col_t matrix[MATRIX_COLS];
+static matrix_col_t matrix_debouncing[MATRIX_COLS];
 
 static matrix_col_t read_rows(void);
 static matrix_row_t read_cols(void);
@@ -122,6 +122,11 @@ matrix_row_t matrix_get_row(uint8_t row)
     return matrix[row];
 }
 
+inline
+matrix_col_t matrix_get_col(uint8_t col)
+{
+    return matrix[col];
+}
 void matrix_print(void)
 {
     print("\nr/c 0123456789ABCDEF\n");
@@ -144,7 +149,9 @@ uint8_t matrix_key_count(void)
 static void init_rows(void)
 {
 	DDRB &= ~(1<<5 | 1<<4);
-	DDRD &= ~(1<<3);
+	PORTB |= (1<<5 | 1<<4);
+	DDRD &= ~(1<<7);
+	PORTD |= (1<<7);
 }
 
 /* Column pin configuration
@@ -165,8 +172,8 @@ static void  init_cols(void)
 static matrix_col_t read_rows(void)
 {
 	return  (PINB&(1<<5) ? 0 : (1<<0)) |
-			(PINB&(1<<4) ? 0 : (1<<1)) |
-			(PIND&(1<<7) ? 0 : (1<<2));
+		(PINB&(1<<4) ? 0 : (1<<1)) |
+		(PIND&(1<<7) ? 0 : (1<<2));
 }
 
 static matrix_row_t read_cols(void)
